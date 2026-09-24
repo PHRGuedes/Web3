@@ -1,0 +1,38 @@
+Você é um agente de desenvolvimento de software avançado. O seu objetivo é construir a base de um sistema de Engenharia de Requisitos (inspirado em um TCC), cumprindo rigorosamente as restrições arquiteturais e de stack de uma disciplina universitária. 
+
+Aviso importante sobre o Frontend: O visual do site (assets, templates, etc.) está estruturado em uma pasta chamada `imagens`. Certifique-se de prever essa estrutura estática no projeto, servindo essa pasta adequadamente se houver rotas de frontend/templates.
+
+A API focará em duas entidades principais para cumprir os requisitos da disciplina: `Usuario` e `Projeto` (entidade principal do CRUD).
+
+STACK TECNOLÓGICA OBRIGATÓRIA:
+- Gerenciador de pacotes: Poetry
+- Framework Web: FastAPI
+- Banco de Dados: PostgreSQL
+- ORM e Migrations: SQLAlchemy e Alembic
+- Validação: Pydantic
+- Autenticação: JWT (JSON Web Tokens) e bcrypt para hash de senhas.
+
+REGRAS ARQUITETURAIS E DE DIRETÓRIOS (RESTRIÇÕES SEVERAS):
+O sistema deve ser estruturado em pastas por entidade (ex: `/usuarios`, `/projetos`).
+Dentro de cada pasta de entidade, crie os seguintes arquivos obedecendo às seguintes regras de corte:
+
+1. `_model.py`: Deve conter os modelos do SQLAlchemy e os Schemas do Pydantic (Create, Update, Public). A senha do usuário NUNCA deve sair no Schema de resposta (Public). O relacionamento entre Usuario e Projeto deve ser de 1 para N mapeado no ORM (`ForeignKey` e `relationship`).
+2. `_repository.py`: A ÚNICA camada que sabe que o banco de dados existe. Todo e qualquer `db.query` deve estar aqui. Se houver `db.query` fora do repositório, o projeto falhará.
+3. `_service.py`: Camada de negócio. Não levanta `HTTPException` e não faz consultas diretas ao banco. O Service aplica regras, toma decisões e chama o repositório. Em caso de recusa de regra de negócio, o Service levanta exceções customizadas importadas de um arquivo global `erros.py`. 
+4. `_controller.py`: Contém o `APIRouter`. Recebe a requisição, delega para o Service e responde. O Controller não deve ter lógica de negócio.
+
+REQUISITOS FUNCIONAIS E ENTREGAS ESPECÍFICAS:
+- Setup Inicial: Inicialize o projeto com Poetry (`pyproject.toml` e `poetry.lock`).
+- Configuração de Banco: Crie o arquivo `database.py` (conexão, `Session` e dependência `get_db`). As credenciais e `DATABASE_URL` devem vir de um arquivo `.env` (que deve constar no `.gitignore`).
+- Migrations: Configure o Alembic. O banco de dados deve ser gerado via migrações (`alembic upgrade head`), sendo expressamente PROIBIDO o uso de `Base.metadata.create_all`.
+- Segurança e Auth: Crie rotas de cadastro (com senha em hash bcrypt) e login (retornando token JWT). A `SECRET_KEY` deve vir do `.env`.
+- Proteção de Rotas: O CRUD da entidade `Projeto` deve ser protegido por uma dependência `get_current_user`.
+- Regra de Negócio (Service): Implemente e documente pelo menos 3 regras de negócio no sistema. Exemplo: RN01 - "Um usuário não pode criar dois projetos com o mesmo nome".
+- Filtro e Multi-tenant: No CRUD de `Projeto`:
+  a) Ao criar um projeto, ele deve ser vinculado automaticamente ao `Usuario` logado (obtido via JWT).
+  b) Ao listar os projetos, o usuário só pode receber os seus próprios registros.
+  c) A listagem de projetos deve incluir parâmetros de busca e filtro (ex: buscar por nome do projeto).
+- Main e Tratamento de Erros: O arquivo `main.py` deve ser extremamente limpo, contendo apenas a instância do FastAPI, o mapeamento de pastas estáticas (como a pasta `imagens`), a inclusão dos roteadores (`app.include_router`) e os Exception Handlers globais (traduzindo as exceções customizadas do arquivo `erros.py` para respostas HTTP 400, 401, 403, 404, etc).
+
+INSTRUÇÃO DE SAÍDA:
+Por favor, gere a estrutura completa do projeto, crie os arquivos de configuração (Poetry, Alembic, .env de exemplo), os arquivos de banco, as dependências de segurança, e os módulos completos para `usuarios` e `projetos`, respeitando estritamente o isolamento da camada de Service e Repository.
