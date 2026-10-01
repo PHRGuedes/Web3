@@ -91,3 +91,12 @@ Acesse no navegador:
 - **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Redoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 - **Imagens Estáticas:** [http://localhost:8000/imagens/dashboard.jpg](http://localhost:8000/imagens/dashboard.jpg)
+
+---
+
+## 📱 Frontend Flutter (ReqFlow)
+
+O frontend cliente do sistema está localizado na pasta `frontend/`, desenvolvido em **Flutter** para Web e Emulador/Dispositivo móvel com arquitetura em camadas (`models`, `repositories`, `services`, `screens`).
+
+Para executar o frontend e rodar os testes unitários mockados, consulte as instruções em:
+👉 [frontend/README.md](frontend/README.md)

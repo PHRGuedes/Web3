@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -25,6 +26,15 @@ app = FastAPI(
     title="API de Engenharia de Requisitos",
     description="Sistema para gestão de requisitos com isolamento por entidade, multi-tenant e autenticação JWT.",
     version="1.0.0",
+)
+
+# Configuração de CORS para permitir requisições do frontend (Web, Mobile e Emuladores)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Servindo arquivos estáticos da pasta 'imagens' conforme aviso do frontend

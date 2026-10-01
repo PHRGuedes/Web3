@@ -34,6 +34,7 @@ def login(
 
 
 @router.get("/me", response_model=UsuarioPublic)
+@router.get("/eu", response_model=UsuarioPublic)
 def obter_usuario_logado(current_user: Usuario = Depends(get_current_user)):
     """Rota protegida para consultar o perfil do usuário logado."""
     return current_user
