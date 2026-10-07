@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../repositories/auth_repository.dart';
-import '../services/auth_service.dart';
-import 'cadastro_screen.dart';
-import 'home_screen.dart';
+import '../routes.dart';
+import '../services/sessao_service.dart';
 
 /// Tela de Login inspirada no protótipo ReqFlow.
-/// RESTRIÇÃO ARQUITETURAL: A tela NUNCA faz HTTP; delega exclusivamente ao AuthService.
+/// RESTRIÇÃO ARQUITETURAL: A tela NUNCA faz HTTP diretamente; delega exclusivamente ao SessaoService.
+/// PROIBIÇÃO DE INJEÇÃO POR CONSTRUTOR: Nenhuma tela pode receber o SessaoService pelo construtor.
+/// NAVEGAÇÃO: Exclusivamente via Navigator.pushNamed, pushReplacementNamed e pushNamedAndRemoveUntil.
 /// REQUISITO OBRIGATÓRIO: Utiliza explicitamente Scaffold, Column, Row e Container.
 class LoginScreen extends StatefulWidget {
-  final AuthService authService;
-
-  const LoginScreen({
-    super.key,
-    required this.authService,
-  });
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -49,20 +46,16 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Chama exclusivamente a camada de serviço (NUNCA faz HTTP diretamente)
-      await widget.authService.login(
+      // REGRA: Dispara ação estritamente via context.read<SessaoService>()
+      await context.read<SessaoService>().login(
         _emailController.text,
         _senhaController.text,
       );
 
       if (!mounted) return;
 
-      // Navega para a Home ao autenticar com sucesso
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => HomeScreen(authService: widget.authService),
-        ),
-      );
+      // REGRA: Transição exclusivamente via pushReplacementNamed
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -124,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withValues(alpha: 0.08),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -162,14 +155,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Cartão Principal de Login
                   // Uso explícito de Container
                   Container(
-                    padding: const EdgeInsets.all(28.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -410,37 +403,37 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 20),
 
                           // Rodapé do Cartão: Link para Cadastro
-                          // Uso explícito de Row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                'Não tem uma conta?',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              GestureDetector(
-                                key: const Key('criarContaLink'),
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => CadastroScreen(authService: widget.authService),
-                                    ),
-                                  );
-                                },
-                                child: const Text(
-                                  'Criar conta',
+                          // Uso explícito de Row com MainAxisSize.min / Wrap para prevenção de overflow
+                          Center(
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                const Text(
+                                  'Não tem uma conta?',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1E60ED),
+                                    color: Color(0xFF64748B),
                                   ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 6),
+                                GestureDetector(
+                                  key: const Key('criarContaLink'),
+                                  onTap: () {
+                                    // REGRA: Transição exclusivamente via pushNamed
+                                    Navigator.of(context).pushNamed(AppRoutes.cadastro);
+                                  },
+                                  child: const Text(
+                                    'Criar conta',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1E60ED),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

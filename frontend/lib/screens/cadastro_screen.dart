@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../repositories/auth_repository.dart';
-import '../services/auth_service.dart';
+import '../routes.dart';
+import '../services/sessao_service.dart';
 
 /// Tela de Cadastro do sistema ReqFlow.
-/// RESTRIÇÃO ARQUITETURAL: A tela NUNCA faz HTTP; delega exclusivamente ao AuthService.
+/// RESTRIÇÃO ARQUITETURAL: A tela NUNCA faz HTTP diretamente; delega exclusivamente ao SessaoService.
+/// PROIBIÇÃO DE INJEÇÃO POR CONSTRUTOR: Nenhuma tela pode receber o SessaoService pelo construtor.
 /// REQUISITO OBRIGATÓRIO: Utiliza explicitamente Scaffold, Column, Row e Container.
 class CadastroScreen extends StatefulWidget {
-  final AuthService authService;
-
-  const CadastroScreen({
-    super.key,
-    required this.authService,
-  });
+  const CadastroScreen({super.key});
 
   @override
   State<CadastroScreen> createState() => _CadastroScreenState();
@@ -58,8 +56,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
     });
 
     try {
-      // Chama exclusivamente a camada de serviço (NUNCA faz HTTP diretamente)
-      await widget.authService.cadastrar(
+      // Chama exclusivamente a camada de serviço via context.read<SessaoService>()
+      await context.read<SessaoService>().cadastrar(
         _nomeController.text,
         _emailController.text,
         _senhaController.text,
@@ -75,7 +73,11 @@ class _CadastroScreenState extends State<CadastroScreen> {
         ),
       );
 
-      Navigator.of(context).pop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -105,7 +107,13 @@ class _CadastroScreenState extends State<CadastroScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+            }
+          },
         ),
       ),
       body: SafeArea(
@@ -123,20 +131,27 @@ class _CadastroScreenState extends State<CadastroScreen> {
                   Center(
                     // Uso explícito de Container
                     child: Container(
-                      width: 52,
-                      height: 52,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
                         color: const Color(0xFF15294E),
                         borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: const Icon(
-                        Icons.view_in_ar_rounded,
+                        Icons.person_add_alt_1_rounded,
                         color: Colors.white,
                         size: 28,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   const Text(
                     'Criar Conta no ReqFlow',
                     textAlign: TextAlign.center,
@@ -147,28 +162,28 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   const Text(
-                    'Cadastre-se para gerenciar seus projetos e requisitos',
+                    'Cadastre-se para acessar a gestão de requisitos',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       color: Color(0xFF64748B),
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Cartão de Cadastro
+                  // Cartão Principal de Cadastro
                   // Uso explícito de Container
                   Container(
-                    padding: const EdgeInsets.all(28.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -180,8 +195,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Banner de Erro
                           if (_errorMessage != null) ...[
-                            // Uso explícito de Container
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -189,15 +204,10 @@ class _CadastroScreenState extends State<CadastroScreen> {
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: const Color(0xFFFCA5A5)),
                               ),
-                              // Uso explícito de Row
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(
-                                    Icons.error_outline_rounded,
-                                    color: Color(0xFFDC2626),
-                                    size: 18,
-                                  ),
+                                  const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
@@ -218,22 +228,15 @@ class _CadastroScreenState extends State<CadastroScreen> {
                           // Campo Nome Completo
                           const Text(
                             'Nome Completo',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
-                            ),
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
                           ),
                           const SizedBox(height: 6),
                           TextFormField(
+                            key: const Key('nomeField'),
                             controller: _nomeController,
                             decoration: InputDecoration(
-                              hintText: 'Ana Ribeiro',
-                              prefixIcon: const Icon(
-                                Icons.person_outline_rounded,
-                                size: 20,
-                                color: Color(0xFF94A3B8),
-                              ),
+                              hintText: 'Ex: Carlos Mendes',
+                              prefixIcon: const Icon(Icons.badge_outlined, size: 20, color: Color(0xFF94A3B8)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -249,9 +252,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.trim().length < 2) {
-                                return 'O nome deve ter no mínimo 2 caracteres';
-                              }
+                              if (val == null || val.trim().isEmpty) return 'Informe seu nome completo';
+                              if (val.trim().length < 2) return 'O nome deve ter ao menos 2 caracteres';
                               return null;
                             },
                           ),
@@ -259,24 +261,17 @@ class _CadastroScreenState extends State<CadastroScreen> {
 
                           // Campo E-mail
                           const Text(
-                            'E-mail',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
-                            ),
+                            'E-mail Corporativo',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
                           ),
                           const SizedBox(height: 6),
                           TextFormField(
+                            key: const Key('emailCadastroField'),
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
-                              hintText: 'ana.ribeiro@reqflow.com',
-                              prefixIcon: const Icon(
-                                Icons.mail_outline_rounded,
-                                size: 20,
-                                color: Color(0xFF94A3B8),
-                              ),
+                              hintText: 'carlos@empresa.com',
+                              prefixIcon: const Icon(Icons.mail_outline_rounded, size: 20, color: Color(0xFF94A3B8)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -292,12 +287,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.trim().isEmpty) {
-                                return 'Informe o e-mail';
-                              }
-                              if (!val.contains('@')) {
-                                return 'E-mail inválido';
-                              }
+                              if (val == null || val.trim().isEmpty) return 'Informe seu e-mail';
+                              if (!val.contains('@')) return 'Informe um e-mail válido';
                               return null;
                             },
                           ),
@@ -306,34 +297,23 @@ class _CadastroScreenState extends State<CadastroScreen> {
                           // Campo Senha
                           const Text(
                             'Senha (mínimo 6 caracteres)',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
-                            ),
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
                           ),
                           const SizedBox(height: 6),
                           TextFormField(
+                            key: const Key('senhaCadastroField'),
                             controller: _senhaController,
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
                               hintText: '••••••••',
-                              prefixIcon: const Icon(
-                                Icons.lock_outline_rounded,
-                                size: 20,
-                                color: Color(0xFF94A3B8),
-                              ),
+                              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: Color(0xFF94A3B8)),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                                   size: 20,
                                   color: const Color(0xFF94A3B8),
                                 ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                               ),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                               border: OutlineInputBorder(
@@ -350,9 +330,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.length < 6) {
-                                return 'A senha deve possuir pelo menos 6 caracteres';
-                              }
+                              if (val == null || val.isEmpty) return 'Informe sua senha';
+                              if (val.length < 6) return 'A senha deve ter no mínimo 6 caracteres';
                               return null;
                             },
                           ),
@@ -360,24 +339,17 @@ class _CadastroScreenState extends State<CadastroScreen> {
 
                           // Campo Confirmar Senha
                           const Text(
-                            'Confirmar Senha',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
-                            ),
+                            'Confirme sua Senha',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
                           ),
                           const SizedBox(height: 6),
                           TextFormField(
+                            key: const Key('confirmaSenhaField'),
                             controller: _confirmaSenhaController,
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
                               hintText: '••••••••',
-                              prefixIcon: const Icon(
-                                Icons.lock_outline_rounded,
-                                size: 20,
-                                color: Color(0xFF94A3B8),
-                              ),
+                              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: Color(0xFF94A3B8)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -393,33 +365,27 @@ class _CadastroScreenState extends State<CadastroScreen> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.isEmpty) {
-                                return 'Confirme a senha';
-                              }
+                              if (val == null || val.isEmpty) return 'Confirme sua senha';
                               return null;
                             },
                           ),
                           const SizedBox(height: 24),
 
-                          // Botão Criar Conta
+                          // Botão Cadastrar
                           // Uso explícito de Container
                           Container(
                             width: double.infinity,
                             height: 48,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
                             child: ElevatedButton(
+                              key: const Key('cadastrarButton'),
                               onPressed: _isLoading ? null : _handleCadastro,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF1E60ED),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              // Uso explícito de Row
                               child: _isLoading
                                   ? const SizedBox(
                                       width: 20,
@@ -433,11 +399,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         Text(
-                                          'Criar Conta',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          'Finalizar Cadastro',
+                                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                                         ),
                                         SizedBox(width: 8),
                                         Icon(Icons.arrow_forward_rounded, size: 18),
@@ -448,30 +411,35 @@ class _CadastroScreenState extends State<CadastroScreen> {
                           const SizedBox(height: 20),
 
                           // Link para voltar ao Login
-                          // Uso explícito de Row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                'Já tem uma conta?',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF64748B),
+                          Center(
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                const Text(
+                                  'Já tem uma conta?',
+                                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                                 ),
-                              ),
-                              const SizedBox(width: 4),
-                              GestureDetector(
-                                onTap: () => Navigator.of(context).pop(),
-                                child: const Text(
-                                  'Fazer login',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1E60ED),
+                                const SizedBox(width: 6),
+                                GestureDetector(
+                                  onTap: () {
+                                    if (Navigator.of(context).canPop()) {
+                                      Navigator.of(context).pop();
+                                    } else {
+                                      Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+                                    }
+                                  },
+                                  child: const Text(
+                                    'Fazer login',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1E60ED),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ],
                       ),

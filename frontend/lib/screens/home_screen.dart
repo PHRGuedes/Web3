@@ -1,57 +1,57 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/usuario.dart';
 import '../repositories/auth_repository.dart';
-import '../services/auth_service.dart';
-import 'login_screen.dart';
+import '../routes.dart';
+import '../services/sessao_service.dart';
+import '../widgets/app_drawer.dart';
 
 /// Tela Inicial (Dashboard) do ReqFlow.
 /// REQUISITO OBRIGATÓRIO: Ao ser carregada, deve obrigatoriamente fazer uma requisição
-/// GET /usuarios/eu enviando o token JWT no cabeçalho de autorização (via AuthService).
+/// GET /usuarios/eu enviando o token JWT no cabeçalho de autorização (via SessaoService).
+/// PROIBIÇÃO DE INJEÇÃO POR CONSTRUTOR: Nenhuma tela pode receber o SessaoService pelo construtor.
+/// NAVEGAÇÃO: Exclusivamente via Navigator.pushNamed, pushReplacementNamed e pushNamedAndRemoveUntil.
 /// REQUISITO OBRIGATÓRIO: Utiliza explicitamente Scaffold, Column, Row e Container.
 class HomeScreen extends StatefulWidget {
-  final AuthService authService;
-
-  const HomeScreen({
-    super.key,
-    required this.authService,
-  });
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  Usuario? _usuario;
-  bool _isLoading = true;
+  bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _carregarUsuarioLogado();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _carregarUsuarioLogado();
+    });
   }
 
   /// REQUISITO DO SISTEMA:
   /// Faz a requisição obrigatória GET /usuarios/eu através da camada de serviço.
   Future<void> _carregarUsuarioLogado() async {
+    final sessao = context.read<SessaoService>();
+    if (sessao.usuario != null) {
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // Chama o AuthService, que internamente aciona o AuthRepository com o token JWT
-      final user = await widget.authService.obterUsuarioAtual();
-      if (!mounted) return;
-      setState(() {
-        _usuario = user;
-      });
+      await sessao.carregarUsuarioAtual();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
         _errorMessage = e.message;
       });
-      // Se não autorizado (401), desloga e redireciona
+      // Se não autorizado (401), desloga e redireciona imediatamente
       if (e.statusCode == 401) {
         _handleLogout();
       }
@@ -69,13 +69,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _handleLogout() async {
-    await widget.authService.logout();
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(authService: widget.authService),
-      ),
+  void _handleLogout() {
+    context.read<SessaoService>().logout();
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRoutes.login,
+      (route) => false,
     );
   }
 
@@ -90,14 +88,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sessao = context.watch<SessaoService>();
+    final usuario = sessao.usuario;
+
     // Uso explícito de Scaffold
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      drawer: const AppDrawer(rotaAtual: AppRoutes.home),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        shadowColor: Colors.black.withOpacity(0.05),
-        titleSpacing: 20,
+        shadowColor: Colors.black.withValues(alpha: 0.05),
+        titleSpacing: 12,
         title: Row(
           children: [
             // Uso explícito de Container
@@ -140,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
-          if (_usuario != null)
+          if (usuario != null)
             Padding(
               padding: const EdgeInsets.only(right: 12.0),
               // Uso explícito de Row
@@ -157,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      _obterIniciais(_usuario!.nome),
+                      _obterIniciais(usuario.nome),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -173,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _usuario!.nome,
+                        usuario.nome,
                         key: const Key('usuarioNomeHeader'),
                         style: const TextStyle(
                           fontSize: 13,
@@ -203,12 +205,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SafeArea(
-        child: _buildBody(),
+        child: _buildBody(usuario),
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(Usuario? usuario) {
     if (_isLoading) {
       return const Center(
         child: Column(
@@ -219,8 +221,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: 16),
             Text(
-              'Carregando perfil via GET /usuarios/eu...',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+              'Carregando dados do usuário autenticado (GET /usuarios/eu)...',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -229,48 +234,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_errorMessage != null) {
       return Center(
-        // Uso explícito de Container
         child: Container(
-          margin: const EdgeInsets.all(24.0),
-          padding: const EdgeInsets.all(24.0),
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            color: const Color(0xFFFEF2F2),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFFCA5A5)),
           ),
-          // Uso explícito de Column
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                color: Color(0xFFDC2626),
-                size: 48,
-              ),
+              const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 36),
               const SizedBox(height: 12),
-              const Text(
-                'Falha na Comunicação',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
+              const SizedBox(height: 16),
+              ElevatedButton(
                 onPressed: _carregarUsuarioLogado,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Tentar novamente'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1E60ED),
                   foregroundColor: Colors.white,
                 ),
+                child: const Text('Tentar Novamente'),
               ),
             ],
           ),
@@ -278,74 +267,80 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final user = _usuario!;
-
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      // Uso explícito de Column
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner de Boas-vindas
+          // Banner de Boas-Vindas com dados do usuário
           // Uso explícito de Container
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24.0),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF1E60ED), Color(0xFF1742A1)],
+                colors: [Color(0xFF15294E), Color(0xFF1E60ED)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF1E60ED).withOpacity(0.25),
+                  color: const Color(0xFF1E60ED).withValues(alpha: 0.2),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
-            // Uso explícito de Row
-            child: Row(
+            // Uso explícito de Column
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  // Uso explícito de Column
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Olá, ${user.nome}!',
-                        key: const Key('usuarioNomeBoasVindas'),
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                // Uso explícito de Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            usuario != null ? 'Olá, ${usuario.nome}!' : 'Bem-vindo ao ReqFlow!',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Sua sessão em memória está ativa. Módulo de Requisitos pronto.',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (usuario != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '#${usuario.id}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Sessão autenticada via JWT. Bem-vindo à plataforma de Engenharia de Requisitos.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Uso explícito de Container
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.verified_user_rounded,
-                    color: Colors.white,
-                    size: 32,
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -364,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Cards de Métricas em Row / Wrap
+          // Cards de Métricas em Wrap
           Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -413,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
               border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -423,18 +418,21 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Uso explícito de Row
+                // Uso explícito de Row com Expanded para evitar qualquer overflow
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Dados do Usuário Autenticado (GET /usuarios/eu)',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
+                    const Expanded(
+                      child: Text(
+                        'Dados do Usuário Autenticado (GET /usuarios/eu)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     // Uso explícito de Container
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -453,34 +451,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                const Divider(color: Color(0xFFF1F5F9), height: 1),
-                const SizedBox(height: 16),
-
-                _buildInfoRow(
-                  label: 'ID do Usuário',
-                  valor: '#${user.id}',
-                  icone: Icons.badge_outlined,
-                ),
-                const SizedBox(height: 12),
-                _buildInfoRow(
-                  label: 'Nome Completo',
-                  valor: user.nome,
-                  icone: Icons.person_outline_rounded,
-                ),
-                const SizedBox(height: 12),
-                _buildInfoRow(
-                  label: 'E-mail Cadastrado',
-                  valor: user.email,
-                  icone: Icons.mail_outline_rounded,
-                ),
-                if (user.createdAt != null) ...[
-                  const SizedBox(height: 12),
-                  _buildInfoRow(
-                    label: 'Data de Cadastro',
-                    valor: user.createdAt!.toLocal().toString().split('.').first,
-                    icone: Icons.calendar_today_outlined,
+                const SizedBox(height: 4),
+                const Text(
+                  'Informações recuperadas pelo AuthService a partir do token em memória.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
                   ),
+                ),
+                const SizedBox(height: 20),
+                if (usuario != null) ...[
+                  _buildInfoRow(
+                    label: 'ID do Usuário',
+                    valor: '#${usuario.id}',
+                    icone: Icons.fingerprint_rounded,
+                  ),
+                  const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                  _buildInfoRow(
+                    label: 'Nome Completo',
+                    valor: usuario.nome,
+                    icone: Icons.person_outline_rounded,
+                  ),
+                  const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                  _buildInfoRow(
+                    label: 'E-mail Cadastrado',
+                    valor: usuario.email,
+                    icone: Icons.mail_outline_rounded,
+                  ),
+                  if (usuario.createdAt != null) ...[
+                    const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                    _buildInfoRow(
+                      label: 'Data de Cadastro',
+                      valor: usuario.createdAt!.toLocal().toString().split('.').first,
+                      icone: Icons.calendar_today_outlined,
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -507,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

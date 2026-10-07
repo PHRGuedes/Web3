@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:provider/provider.dart';
 import '../../lib/models/auth_token.dart';
 import '../../lib/models/login_request.dart';
 import '../../lib/models/usuario.dart';
 import '../../lib/repositories/auth_repository.dart';
-import '../../lib/services/auth_service.dart';
+import '../../lib/routes.dart';
 import '../../lib/screens/login_screen.dart';
 import '../../lib/screens/home_screen.dart';
+import '../../lib/services/sessao_service.dart';
 
 class MockAuthRepository extends Mock implements IAuthRepository {}
 class FakeLoginRequest extends Fake implements LoginRequest {}
 
 void main() {
   late MockAuthRepository mockRepository;
-  late AuthService authService;
+  late SessaoService sessaoService;
 
   setUpAll(() {
     registerFallbackValue(FakeLoginRequest());
@@ -22,12 +24,19 @@ void main() {
 
   setUp(() {
     mockRepository = MockAuthRepository();
-    authService = AuthService(repository: mockRepository);
+    sessaoService = SessaoService(authRepository: mockRepository);
   });
 
   Widget createWidgetUnderTest() {
-    return MaterialApp(
-      home: LoginScreen(authService: authService),
+    return ChangeNotifierProvider<SessaoService>.value(
+      value: sessaoService,
+      child: MaterialApp(
+        initialRoute: AppRoutes.login,
+        routes: {
+          AppRoutes.login: (context) => const LoginScreen(),
+          AppRoutes.home: (context) => const HomeScreen(),
+        },
+      ),
     );
   }
 
@@ -65,7 +74,7 @@ void main() {
       await tester.tap(find.byKey(const Key('entrarButton')));
       await tester.pumpAndSettle();
 
-      // Verifica que a mensagem clara de erro é exibida
+      // Verifica que a mensagem de erro é exibida
       expect(find.text('E-mail ou senha inválidos.'), findsWidgets);
 
       // Garante que o app permaneceu na tela de Login e não navegou para a HomeScreen
@@ -73,7 +82,7 @@ void main() {
       expect(find.byType(HomeScreen), findsNothing);
     });
 
-    testWidgets('Fluxo de Sucesso: Credenciais válidas salvam JWT e navegam para HomeScreen', (WidgetTester tester) async {
+    testWidgets('Fluxo de Sucesso: Credenciais válidas salvam JWT em memória e navegam via rotas nomeadas para HomeScreen', (WidgetTester tester) async {
       const token = AuthToken(accessToken: 'jwt_mock_token_123');
       const usuarioLogado = Usuario(
         id: 1,
@@ -95,10 +104,10 @@ void main() {
       await tester.tap(find.byKey(const Key('entrarButton')));
       await tester.pumpAndSettle();
 
-      // Verifica que navegou para HomeScreen e executou GET /usuarios/eu exibindo dados do usuário
+      // Verifica que navegou para HomeScreen via AppRoutes.home
       expect(find.byType(HomeScreen), findsOneWidget);
       expect(find.text('Olá, Ana Ribeiro!'), findsOneWidget);
-      expect(find.text('#1'), findsOneWidget);
+      expect(find.text('#1'), findsWidgets);
     });
   });
 }

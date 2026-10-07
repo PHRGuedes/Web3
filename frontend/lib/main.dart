@@ -1,47 +1,47 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import 'constants/api_constants.dart';
 import 'repositories/auth_repository.dart';
-import 'services/auth_service.dart';
-import 'screens/login_screen.dart';
+import 'routes.dart';
+import 'screens/cadastro_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/perfil_screen.dart';
+import 'screens/projetos_screen.dart';
+import 'services/sessao_service.dart';
 
-/// Ponto de entrada da aplicação Flutter.
-/// REGRA ARQUITETURAL: Responsável pela montagem e injeção de dependências
-/// (instancia repositório, serviço e passa para as telas).
-void main() async {
+/// Ponto de entrada da aplicação Flutter (ReqFlow).
+/// GERÊNCIA DE ESTADO (PROVIDER):
+/// - Injetado no topo absoluto do app (envolvendo o MaterialApp).
+/// - Nenhuma tela recebe o SessaoService por construtor.
+/// - Volatilidade: O token JWT permanece exclusivamente em memória.
+/// NAVEGAÇÃO E ROTAS:
+/// - Utiliza a propriedade `routes:` para registrar todas as telas.
+/// - Telas sensíveis encapsuladas pelo guarda `RotaProtegida`.
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  SharedPreferences? prefs;
-  try {
-    prefs = await SharedPreferences.getInstance();
-  } catch (_) {
-    // Permite inicialização sem erro caso SharedPreferences falhe em ambiente restrito
-    prefs = null;
-  }
 
   // 1. Instancia o repositório HTTP (único que faz chamadas à API)
   final authRepository = AuthRepository(
     baseUrl: ApiConstants.baseUrl,
   );
 
-  // 2. Instancia o serviço de autenticação (orquestração e regras de negócio)
-  final authService = AuthService(
-    repository: authRepository,
-    prefs: prefs,
+  // 2. Instancia o SessaoService (mantendo JWT volátil apenas em memória)
+  final sessaoService = SessaoService(
+    authRepository: authRepository,
   );
 
-  // 3. Inicia o aplicativo passando as dependências montadas
-  runApp(ReqFlowApp(authService: authService));
+  // 3. Inicia a aplicação com ChangeNotifierProvider no topo absoluto
+  runApp(
+    ChangeNotifierProvider<SessaoService>(
+      create: (_) => sessaoService,
+      child: const ReqFlowApp(),
+    ),
+  );
 }
 
 class ReqFlowApp extends StatelessWidget {
-  final AuthService authService;
-
-  const ReqFlowApp({
-    super.key,
-    required this.authService,
-  });
+  const ReqFlowApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +55,6 @@ class ReqFlowApp extends StatelessWidget {
           seedColor: const Color(0xFF1E60ED),
           primary: const Color(0xFF1E60ED),
           surface: Colors.white,
-          background: const Color(0xFFF8FAFC),
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         inputDecorationTheme: InputDecorationTheme(
@@ -76,10 +75,15 @@ class ReqFlowApp extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         ),
       ),
-      // Se houver token prévio salvo, abre direto na Home; senão abre no Login
-      home: authService.isAuthenticated
-          ? HomeScreen(authService: authService)
-          : LoginScreen(authService: authService),
+      initialRoute: AppRoutes.login,
+      // REGRA OBRIGATÓRIA: Mapeamento de todas as telas na propriedade routes:
+      routes: {
+        AppRoutes.login: (context) => const LoginScreen(),
+        AppRoutes.cadastro: (context) => const CadastroScreen(),
+        AppRoutes.home: (context) => const RotaProtegida(child: HomeScreen()),
+        AppRoutes.perfil: (context) => const RotaProtegida(child: PerfilScreen()),
+        AppRoutes.projetos: (context) => const RotaProtegida(child: ProjetosScreen()),
+      },
     );
   }
 }
