@@ -2,46 +2,74 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'constants/api_constants.dart';
 import 'repositories/auth_repository.dart';
+import 'repositories/local_storage_repository.dart';
+import 'repositories/projeto_repository.dart';
 import 'routes.dart';
 import 'screens/cadastro_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/perfil_screen.dart';
 import 'screens/projetos_screen.dart';
+import 'screens/projeto_detalhes_screen.dart';
+import 'services/projeto_service.dart';
 import 'services/sessao_service.dart';
 
 /// Ponto de entrada da aplicação Flutter (ReqFlow).
 /// GERÊNCIA DE ESTADO (PROVIDER):
-/// - Injetado no topo absoluto do app (envolvendo o MaterialApp).
-/// - Nenhuma tela recebe o SessaoService por construtor.
-/// - Volatilidade: O token JWT permanece exclusivamente em memória.
+/// - Injetado no topo absoluto do app (envolvendo o MaterialApp via MultiProvider).
+/// - Nenhuma tela recebe serviços por construtor.
+/// - Persistência: O token JWT é persistido via LocalStorageRepository (SharedPreferences).
+/// - Inicialização Silenciosa: Recupera o token antes de inicializar o app e ajusta initialRoute.
 /// NAVEGAÇÃO E ROTAS:
-/// - Utiliza a propriedade `routes:` para registrar todas as telas.
+/// - Mapeamento estrito em `routes:`.
 /// - Telas sensíveis encapsuladas pelo guarda `RotaProtegida`.
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Instancia o repositório HTTP (único que faz chamadas à API)
+  // 1. Instancia os repositórios (únicos que realizam I/O e HTTP)
+  final storageRepository = LocalStorageRepository();
   final authRepository = AuthRepository(
     baseUrl: ApiConstants.baseUrl,
   );
-
-  // 2. Instancia o SessaoService (mantendo JWT volátil apenas em memória)
-  final sessaoService = SessaoService(
-    authRepository: authRepository,
+  final projetoRepository = ProjetoRepository(
+    baseUrl: ApiConstants.baseUrl,
   );
 
-  // 3. Inicia a aplicação com ChangeNotifierProvider no topo absoluto
+  // 2. Instancia o SessaoService e inicializa sessão silenciosa
+  final sessaoService = SessaoService(
+    authRepository: authRepository,
+    storageRepository: storageRepository,
+  );
+  await sessaoService.inicializarSessaoSilenciosa();
+
+  // 3. Instancia o ProjetoService vinculado ao SessaoService
+  final projetoService = ProjetoService(
+    projetoRepository: projetoRepository,
+    sessaoService: sessaoService,
+  );
+
+  // 4. Define rota inicial: se houver token no storage vai para Home, senão Login
+  final initialRoute = sessaoService.isAuthenticated ? AppRoutes.home : AppRoutes.login;
+
+  // 5. Inicia a aplicação com MultiProvider no topo absoluto
   runApp(
-    ChangeNotifierProvider<SessaoService>(
-      create: (_) => sessaoService,
-      child: const ReqFlowApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SessaoService>.value(value: sessaoService),
+        Provider<ProjetoService>.value(value: projetoService),
+      ],
+      child: ReqFlowApp(initialRoute: initialRoute),
     ),
   );
 }
 
 class ReqFlowApp extends StatelessWidget {
-  const ReqFlowApp({super.key});
+  final String initialRoute;
+
+  const ReqFlowApp({
+    super.key,
+    this.initialRoute = AppRoutes.login,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +103,7 @@ class ReqFlowApp extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         ),
       ),
-      initialRoute: AppRoutes.login,
+      initialRoute: initialRoute,
       // REGRA OBRIGATÓRIA: Mapeamento de todas as telas na propriedade routes:
       routes: {
         AppRoutes.login: (context) => const LoginScreen(),
@@ -83,6 +111,7 @@ class ReqFlowApp extends StatelessWidget {
         AppRoutes.home: (context) => const RotaProtegida(child: HomeScreen()),
         AppRoutes.perfil: (context) => const RotaProtegida(child: PerfilScreen()),
         AppRoutes.projetos: (context) => const RotaProtegida(child: ProjetosScreen()),
+        AppRoutes.projetoDetalhes: (context) => const RotaProtegida(child: ProjetoDetalhesScreen()),
       },
     );
   }

@@ -11,12 +11,14 @@ class AppRoutes {
   static const String home = '/home';
   static const String perfil = '/perfil';
   static const String projetos = '/projetos';
+  static const String projetoDetalhes = '/projetos/detalhes';
 
   /// Lista de rotas restritas que exigem sessão ativa
   static const List<String> rotasProtegidas = [
     home,
     perfil,
     projetos,
+    projetoDetalhes,
   ];
 
   /// Helper para encapsular telas que exigem autenticação

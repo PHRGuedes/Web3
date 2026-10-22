@@ -9,22 +9,30 @@ import '../../lib/screens/home_screen.dart';
 import '../../lib/screens/login_screen.dart';
 import '../../lib/screens/perfil_screen.dart';
 import '../../lib/screens/projetos_screen.dart';
+import '../../lib/screens/projeto_detalhes_screen.dart';
+import '../../lib/services/projeto_service.dart';
 import '../../lib/services/sessao_service.dart';
 
 class MockAuthRepository extends Mock implements IAuthRepository {}
+class MockProjetoService extends Mock implements ProjetoService {}
 
 void main() {
   late MockAuthRepository mockRepository;
+  late MockProjetoService mockProjetoService;
   late SessaoService sessaoService;
 
   setUp(() {
     mockRepository = MockAuthRepository();
+    mockProjetoService = MockProjetoService();
     sessaoService = SessaoService(authRepository: mockRepository);
   });
 
   Widget buildAppUnderTest({required String initialRoute}) {
-    return ChangeNotifierProvider<SessaoService>.value(
-      value: sessaoService,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SessaoService>.value(value: sessaoService),
+        Provider<ProjetoService>.value(value: mockProjetoService),
+      ],
       child: MaterialApp(
         initialRoute: initialRoute,
         routes: {
@@ -32,6 +40,7 @@ void main() {
           AppRoutes.home: (context) => const RotaProtegida(child: HomeScreen()),
           AppRoutes.perfil: (context) => const RotaProtegida(child: PerfilScreen()),
           AppRoutes.projetos: (context) => const RotaProtegida(child: ProjetosScreen()),
+          AppRoutes.projetoDetalhes: (context) => const RotaProtegida(child: ProjetoDetalhesScreen()),
         },
       ),
     );
@@ -68,6 +77,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ProjetosScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+    });
+
+    testWidgets('Bloqueio: Tentar acessar rota protegida /projetos/detalhes sem sessão redireciona para /login', (WidgetTester tester) async {
+      expect(sessaoService.isAuthenticated, isFalse);
+
+      await tester.pumpWidget(buildAppUnderTest(initialRoute: AppRoutes.projetoDetalhes));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProjetoDetalhesScreen), findsNothing);
       expect(find.byType(LoginScreen), findsOneWidget);
     });
 

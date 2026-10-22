@@ -1,15 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/projeto.dart';
+import '../repositories/auth_repository.dart';
 import '../routes.dart';
+import '../services/projeto_service.dart';
 import '../widgets/app_drawer.dart';
 
-/// Tela de Projetos (Placeholder) do sistema de Engenharia de Requisitos (ReqFlow).
-/// REQUISITO OBRIGATÓRIO:
-/// 1. Atua como o lugar reservado para gestão de projetos de requisitos.
-/// 2. Proibição de injeção por construtor: Não recebe SessaoService por parâmetro.
-/// 3. Utiliza explicitamente Scaffold, Column, Row e Container.
-/// 4. Possui o Menu Lateral (Drawer) compartilhado.
-class ProjetosScreen extends StatelessWidget {
+/// Tela de Listagem de Projetos de Requisitos do sistema ReqFlow.
+/// RESTRIÇÃO ARQUITETURAL:
+/// 1. A tela NUNCA faz chamadas HTTP e NUNCA manipula JSON ou Status Codes (200, 400, 404).
+/// 2. Consome exclusivamente o `ProjetoService`.
+/// 3. OBRIGATÓRIO: Uso de `FutureBuilder` e `ListView.builder`.
+/// 4. Tratamento explícito de 4 Estados:
+///    a) Carregando (CircularProgressIndicator).
+///    b) Erro (mensagem amigável da ApiException + botão "Tentar de novo").
+///    c) Lista Vazia (mensagem clara de ausência de registros).
+///    d) Lista Preenchida (ListView.builder desenhando os cards reais).
+/// 5. Ao tocar no card, navega para AppRoutes.projetoDetalhes passando `projeto.id` como argumento.
+class ProjetosScreen extends StatefulWidget {
   const ProjetosScreen({super.key});
+
+  @override
+  State<ProjetosScreen> createState() => _ProjetosScreenState();
+}
+
+class _ProjetosScreenState extends State<ProjetosScreen> {
+  Future<List<Projeto>>? _futureProjetos;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_futureProjetos == null) {
+      _carregarProjetos();
+    }
+  }
+
+  void _carregarProjetos() {
+    setState(() {
+      _futureProjetos = context.read<ProjetoService>().listarProjetos();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,139 +57,209 @@ class ProjetosScreen extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Atualizar lista',
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF1E60ED)),
+            onPressed: _carregarProjetos,
+          ),
+        ],
       ),
       drawer: const AppDrawer(rotaAtual: AppRoutes.projetos),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
-              // Uso explícito de Column
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Cabeçalho da Seção de Projetos
-                  // Uso explícito de Container
-                  Container(
-                    padding: const EdgeInsets.all(24.0),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF15294E),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: FutureBuilder<List<Projeto>>(
+              future: _futureProjetos,
+              builder: (context, snapshot) {
+                // ESTADO 1: Carregando
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          color: Color(0xFF1E60ED),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Carregando projetos de requisitos...',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Uso explícito de Row
-                        Row(
+                  );
+                }
+
+                // ESTADO 2: Erro com opção de Tentar Novamente
+                if (snapshot.hasError) {
+                  final error = snapshot.error;
+                  final mensagemErro = error is ApiException
+                      ? error.message
+                      : 'Ocorreu um erro ao buscar os projetos.';
+
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(28.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFEE2E2)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(10),
+                              padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(10),
+                                color: const Color(0xFFFEE2E2),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Icon(
-                                Icons.account_tree_rounded,
-                                color: Colors.white,
-                                size: 24,
+                                Icons.error_outline_rounded,
+                                color: Color(0xFFDC2626),
+                                size: 36,
                               ),
                             ),
-                            const SizedBox(width: 14),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Engenharia de Requisitos',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Gerenciamento de Épicos, Histórias de Usuário e Critérios de Aceite',
-                                    style: TextStyle(
-                                      color: Color(0xFF94A3B8),
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Não foi possível carregar os projetos',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              mensagemErro,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: _carregarProjetos,
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('Tentar de novo'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1E60ED),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 18),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E60ED).withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF1E60ED).withValues(alpha: 0.5)),
-                          ),
-                          child: const Text(
-                            'Área Reservada: O catálogo completo de requisitos e rastreabilidade estará disponível na próxima iteração.',
-                            style: TextStyle(
-                              color: Color(0xFFE2E8F0),
-                              fontSize: 12,
-                            ),
-                          ),
+                      ),
+                    ),
+                  );
+                }
+
+                final projetos = snapshot.data ?? [];
+
+                // ESTADO 3: Lista Vazia
+                if (projetos.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(32.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                      ],
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.folder_off_rounded,
+                                color: Color(0xFF94A3B8),
+                                size: 42,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            const Text(
+                              'Nenhum projeto encontrado',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Você ainda não possui projetos cadastrados em sua conta.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            OutlinedButton.icon(
+                              onPressed: _carregarProjetos,
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('Recarregar'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF1E60ED),
+                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  );
+                }
 
-                  const SizedBox(height: 28),
+                // ESTADO 4: Lista Preenchida (ListView.builder com cards reais)
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+                  itemCount: projetos.length + 1, // +1 para o cabeçalho explicativo
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 20.0),
+                        child: _buildBannerInformativo(total: projetos.length),
+                      );
+                    }
 
-                  // Título da Lista
-                  const Text(
-                    'Projetos em Andamento (Demonstração)',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Cards de Projetos (Placeholder)
-                  _buildProjetoCard(
-                    nome: 'ReqFlow - Sistema Web & Mobile',
-                    descricao: 'Módulo de autenticação segura, gestão de sessões em memória e rastreabilidade de requisitos.',
-                    status: 'Em Desenvolvimento',
-                    requisitosCount: 18,
-                    statusColor: const Color(0xFF1E60ED),
-                    statusBg: const Color(0xFFEFF6FF),
-                  ),
-                  const SizedBox(height: 14),
-                  _buildProjetoCard(
-                    nome: 'Portal Corporativo de Requisitos',
-                    descricao: 'Levantamento de histórias de usuário, elicitação de stakeholders e matriz de rastreabilidade.',
-                    status: 'Planejamento',
-                    requisitosCount: 12,
-                    statusColor: const Color(0xFFD97706),
-                    statusBg: const Color(0xFFFEF3C7),
-                  ),
-                  const SizedBox(height: 14),
-                  _buildProjetoCard(
-                    nome: 'API de Integração Contínua ReqFlow',
-                    descricao: 'Serviços REST para versionamento de requisitos e sincronização com repositórios Git.',
-                    status: 'Concluído',
-                    requisitosCount: 8,
-                    statusColor: const Color(0xFF059669),
-                    statusBg: const Color(0xFFD1FAE5),
-                  ),
-                ],
-              ),
+                    final projeto = projetos[index - 1];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14.0),
+                      child: _buildProjetoCard(projeto),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ),
@@ -167,92 +267,177 @@ class ProjetosScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProjetoCard({
-    required String nome,
-    required String descricao,
-    required String status,
-    required int requisitosCount,
-    required Color statusColor,
-    required Color statusBg,
-  }) {
-    // Uso explícito de Container
+  Widget _buildBannerInformativo({required int total}) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: const Color(0xFF15294E),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      // Uso explícito de Column
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Cabeçalho do Card
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  nome,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            descricao,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF64748B),
-              height: 1.4,
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.account_tree_rounded,
+              color: Colors.white,
+              size: 24,
             ),
           ),
-          const SizedBox(height: 16),
-          // Rodapé do Card
-          Row(
-            children: [
-              const Icon(Icons.list_alt_rounded, size: 16, color: Color(0xFF94A3B8)),
-              const SizedBox(width: 6),
-              Text(
-                '$requisitosCount Requisitos especificados',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF64748B),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Meus Projetos de Requisitos',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  '$total projeto(s) vinculado(s) à sua conta',
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProjetoCard(Projeto projeto) {
+    final dataFormatada =
+        '${projeto.createdAt.day.toString().padLeft(2, '0')}/${projeto.createdAt.month.toString().padLeft(2, '0')}/${projeto.createdAt.year}';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          // REGRA DE NAVEGAÇÃO: Rota nomeada passando projeto.id como argumento
+          Navigator.of(context).pushNamed(
+            AppRoutes.projetoDetalhes,
+            arguments: projeto.id,
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-        ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cabeçalho do Card
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      projeto.nome,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '#${projeto.id}',
+                      style: const TextStyle(
+                        color: Color(0xFF1E60ED),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                projeto.descricao != null && projeto.descricao!.trim().isNotEmpty
+                    ? projeto.descricao!
+                    : 'Sem descrição cadastrada.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Rodapé do Card
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Criado em $dataFormatada',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Row(
+                    children: [
+                      Text(
+                        'Ver detalhes',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E60ED),
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF1E60ED)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

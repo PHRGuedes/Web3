@@ -65,24 +65,46 @@ class _CadastroScreenState extends State<CadastroScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Conta criada com sucesso! Faça login para continuar.'),
-          backgroundColor: Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+      final sessao = context.read<SessaoService>();
+      if (sessao.isAuthenticated) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conta criada e autenticada com sucesso!'),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.home,
+          (route) => false,
+        );
       } else {
         Navigator.of(context).pushReplacementNamed(AppRoutes.login);
       }
     } on ApiException catch (e) {
       if (!mounted) return;
+      if (e.statusCode == 201) {
+        // Caso de criação de conta bem sucedida com necessidade de login manual
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+        return;
+      }
       setState(() {
         _errorMessage = e.message;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
