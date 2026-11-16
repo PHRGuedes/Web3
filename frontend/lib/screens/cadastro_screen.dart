@@ -83,18 +83,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      if (e.statusCode == 201) {
-        // Caso de criação de conta bem sucedida com necessidade de login manual
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: const Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.of(context).pushReplacementNamed(AppRoutes.login);
-        return;
-      }
       setState(() {
         _errorMessage = e.message;
       });

@@ -1,0 +1,38 @@
+# Segredos e variáveis de ambiente locais (NUNCA dentro da imagem)
+.env
+.env.*
+*.env
+
+# Controle de versão e ferramentas de IA
+.git
+.gitignore
+.agents
+.ag-kit-backups
+
+# Cache e artefatos Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ambientes virtuais locais
+.venv/
+env/
+venv/
+ENV/
+
+# Frontend Flutter (hospedado separadamente)
+frontend/
+
+# Configurações de IDE e SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Docker e Compose locais
+docker-compose.yml
+docker-compose.*.yml

@@ -52,9 +52,13 @@ O arquivo [api_constants.dart](lib/constants/api_constants.dart) detecta automat
 - **Navegador Web / Desktop:** Comunica-se com `http://localhost:8000`.
 - **Emulador Android:** Comunica-se com `http://10.0.2.2:8000` (endereço de loopback especial do emulador que acessa o `localhost` do seu computador).
 
-Para apontar para uma URL customizada em tempo de execução:
+Para apontar para uma URL customizada em tempo de execução ou compilar para produção (Vercel / Netlify / Firebase):
 ```bash
-flutter run -d chrome --dart-define=API_URL=http://seu-servidor:8000
+# Execução no navegador apontando para a API no ar
+flutter run -d chrome --dart-define=API_URL=https://reqflow-api.onrender.com
+
+# Build estático de produção para deploy em nuvem (Vercel/Netlify)
+flutter build web --dart-define=API_URL=https://reqflow-api.onrender.com
 ```
 
 ---
@@ -114,13 +118,42 @@ flutter test
 ```bash
 # Testes dos Models (fromJson e toJson)
 flutter test test/models/models_test.dart
+flutter test test/models/projeto_test.dart
 
-# Testes de unidade do AuthService (Mocks do AuthRepository)
+# Testes de unidade dos Services (Mocks dos Repositories)
 flutter test test/services/auth_service_test.dart
+flutter test test/services/projeto_service_test.dart
 
-# Testes de widget da LoginScreen (Scaffold, Column, Row, Container, mensagens de erro)
+# Testes de unidade dos Repositories (Mocks http.Client)
+flutter test test/repositories/local_storage_repository_test.dart
+flutter test test/repositories/projeto_repository_test.dart
+
+# Testes de telas e widgets (Formulário, Diálogos, 4 Estados e Rotas)
 flutter test test/screens/login_screen_test.dart
+flutter test test/screens/projetos_screen_test.dart
+flutter test test/screens/projeto_detalhes_screen_test.dart
+flutter test test/screens/projeto_form_screen_test.dart
+flutter test test/routes/rota_protegida_test.dart
 ```
+
+### Testes de Backend (FastAPI / Pytest com TestClient):
+Para executar os testes automatizados da API backend (a partir da raiz do projeto):
+```bash
+poetry run pytest -v
+```
+
+---
+
+## 📋 Checklist das Seis Funcionalidades Mínimas
+
+| # | Funcionalidade Mínima | Onde Está no Código | Como Provar (Manual e Automatizado) |
+|---|-----------------------|---------------------|--------------------------------------|
+| **1** | **Autenticação JWT, Persistência e Rotas Protegidas** | • [sessao_service.dart](lib/services/sessao_service.dart)<br>• [local_storage_repository.dart](lib/repositories/local_storage_repository.dart)<br>• [routes.dart](lib/routes.dart) (`RotaProtegida`)<br>• [main.dart](lib/main.dart) | **Manual:** Fazer login ou cadastro (com auto-login) e dar F5 no navegador: a sessão permanece ativa via `SharedPreferences`. Acessar rotas internas sem token redireciona para `/login`.<br>**Automatizado:** `flutter test test/routes/rota_protegida_test.dart` e `flutter test test/services/sessao_service_test.dart`. |
+| **2** | **Listagem com 4 Estados (FutureBuilder e ListView.builder)** | • [projetos_screen.dart](lib/screens/projetos_screen.dart)<br>• [projeto_service.dart](lib/services/projeto_service.dart)<br>• [projeto_repository.dart](lib/repositories/projeto_repository.dart) | **Manual:** Abre a listagem exibindo loading (`CircularProgressIndicator`), cards reais em `ListView.builder`, erro com botão "Tentar de novo" se a API estiver fora, ou tela de lista vazia.<br>**Automatizado:** `flutter test test/screens/projetos_screen_test.dart`. |
+| **3** | **Busca/Filtro via API (`?nome=`) com Feedback na Lista Vazia** | • [projetos_screen.dart](lib/screens/projetos_screen.dart)<br>• [projeto_service.dart](lib/services/projeto_service.dart)<br>• [projeto_repository.dart](lib/repositories/projeto_repository.dart) | **Manual:** Digitar no campo de busca: requisição vai para `GET /projetos/?nome=termo`. Se não houver itens, a tela vazia exibe: *"Nenhum resultado corresponde à busca por '[termo]'."* com botão "Limpar busca".<br>**Automatizado:** `flutter test test/screens/projetos_screen_test.dart` e `flutter test test/repositories/projeto_repository_test.dart`. |
+| **4** | **Formulário Unificado com `Form`, `TextFormField` e Validação (`validator`)** | • [projeto_form_screen.dart](lib/screens/projeto_form_screen.dart)<br>• [routes.dart](lib/routes.dart) (`/projetos/form`) | **Manual:** Botão "+" abre tela limpa como "Novo Projeto". Salvar vazio dispara `validator` impedindo envio. Clicar em "Editar" no card abre a mesma tela como "Editar Projeto" com dados pré-carregados.<br>**Automatizado:** `flutter test test/screens/projeto_form_screen_test.dart`. |
+| **5** | **Recusa da API (422, 409) com Frase na Tela, Formulário Aberto e Feedbacks** | • [projeto_form_screen.dart](lib/screens/projeto_form_screen.dart)<br>• [projeto_repository.dart](lib/repositories/projeto_repository.dart) (`_processResponse`) | **Manual:** Salvar com nome duplicado: API retorna 409 Conflito. O formulário **continua aberto**, exibe banner com a frase da API e dispara SnackBar de erro. Erro 422 de validação também exibe a frase da API.<br>**Automatizado:** `flutter test test/screens/projeto_form_screen_test.dart` e `flutter test test/repositories/projeto_repository_test.dart`. |
+| **6** | **Exclusão (DELETE) com Confirmação (`showDialog`) e Atualização Reativa da Lista** | • [projetos_screen.dart](lib/screens/projetos_screen.dart)<br>• [projeto_detalhes_screen.dart](lib/screens/projeto_detalhes_screen.dart)<br>• [projeto_service.dart](lib/services/projeto_service.dart)<br>• [projeto_repository.dart](lib/repositories/projeto_repository.dart) | **Manual:** Clicar na lixeira abre `AlertDialog` via `showDialog`. "Cancelar" aborta; "Excluir" chama `DELETE`, exibe SnackBar de sucesso e a lista recarrega. Salvar no formulário fecha com `pop(context, true)` e a lista também recarrega.<br>**Automatizado:** `flutter test test/screens/projetos_screen_test.dart` e `flutter test test/screens/projeto_detalhes_screen_test.dart`. |
 
 ---
 

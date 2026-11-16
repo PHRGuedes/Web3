@@ -11,6 +11,7 @@ import 'screens/login_screen.dart';
 import 'screens/perfil_screen.dart';
 import 'screens/projetos_screen.dart';
 import 'screens/projeto_detalhes_screen.dart';
+import 'screens/projeto_form_screen.dart';
 import 'services/projeto_service.dart';
 import 'services/sessao_service.dart';
 
@@ -112,6 +113,7 @@ class ReqFlowApp extends StatelessWidget {
         AppRoutes.perfil: (context) => const RotaProtegida(child: PerfilScreen()),
         AppRoutes.projetos: (context) => const RotaProtegida(child: ProjetosScreen()),
         AppRoutes.projetoDetalhes: (context) => const RotaProtegida(child: ProjetoDetalhesScreen()),
+        AppRoutes.projetoForm: (context) => const RotaProtegida(child: ProjetoFormScreen()),
       },
     );
   }

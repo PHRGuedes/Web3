@@ -28,6 +28,9 @@ void main() {
         Provider<ProjetoService>.value(value: mockProjetoService),
       ],
       child: MaterialApp(
+        routes: {
+          '/projetos/form': (context) => const Scaffold(body: Text('Form Mock')),
+        },
         onGenerateRoute: (settings) {
           return MaterialPageRoute(
             settings: RouteSettings(name: '/projetos/detalhes', arguments: arguments),
@@ -88,6 +91,57 @@ void main() {
 
       expect(find.text('Projeto não identificado'), findsOneWidget);
       expect(find.text('Voltar para Projetos'), findsOneWidget);
+    });
+
+    testWidgets('Excluir projeto abre diálogo de confirmação e confirma exclusão', (WidgetTester tester) async {
+      final projeto = Projeto(
+        id: 42,
+        nome: 'Projeto para Deletar',
+        descricao: 'Desc',
+        usuarioId: 1,
+        createdAt: DateTime(2026, 10, 22),
+      );
+
+      when(() => mockProjetoService.obterProjeto(42)).thenAnswer((_) async => projeto);
+      when(() => mockProjetoService.deletarProjeto(42)).thenAnswer((_) async {});
+
+      await tester.pumpWidget(createWidgetUnderTest(arguments: 42));
+      await tester.pumpAndSettle();
+
+      // Clica no botão de excluir no detalhe
+      await tester.tap(find.byKey(const Key('btn_detalhes_excluir_projeto')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Confirmar Exclusão'), findsOneWidget);
+      expect(find.byKey(const Key('btn_cancelar_exclusao_detalhes')), findsOneWidget);
+      expect(find.byKey(const Key('btn_confirmar_exclusao_detalhes')), findsOneWidget);
+
+      // Confirma exclusão
+      await tester.tap(find.byKey(const Key('btn_confirmar_exclusao_detalhes')));
+      await tester.pumpAndSettle();
+
+      verify(() => mockProjetoService.deletarProjeto(42)).called(1);
+    });
+
+    testWidgets('Editar projeto navega para formulário', (WidgetTester tester) async {
+      final projeto = Projeto(
+        id: 42,
+        nome: 'Projeto para Editar',
+        descricao: 'Desc',
+        usuarioId: 1,
+        createdAt: DateTime(2026, 10, 22),
+      );
+
+      when(() => mockProjetoService.obterProjeto(42)).thenAnswer((_) async => projeto);
+
+      await tester.pumpWidget(createWidgetUnderTest(arguments: 42));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('btn_detalhes_editar_projeto')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Form Mock'), findsOneWidget);
     });
   });
 }

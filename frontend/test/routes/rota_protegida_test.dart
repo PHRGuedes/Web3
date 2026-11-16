@@ -10,6 +10,7 @@ import '../../lib/screens/login_screen.dart';
 import '../../lib/screens/perfil_screen.dart';
 import '../../lib/screens/projetos_screen.dart';
 import '../../lib/screens/projeto_detalhes_screen.dart';
+import '../../lib/screens/projeto_form_screen.dart';
 import '../../lib/services/projeto_service.dart';
 import '../../lib/services/sessao_service.dart';
 
@@ -41,6 +42,7 @@ void main() {
           AppRoutes.perfil: (context) => const RotaProtegida(child: PerfilScreen()),
           AppRoutes.projetos: (context) => const RotaProtegida(child: ProjetosScreen()),
           AppRoutes.projetoDetalhes: (context) => const RotaProtegida(child: ProjetoDetalhesScreen()),
+          AppRoutes.projetoForm: (context) => const RotaProtegida(child: ProjetoFormScreen()),
         },
       ),
     );
@@ -87,6 +89,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ProjetoDetalhesScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+    });
+
+    testWidgets('Bloqueio: Tentar acessar rota protegida /projetos/form sem sessão redireciona para /login', (WidgetTester tester) async {
+      expect(sessaoService.isAuthenticated, isFalse);
+
+      await tester.pumpWidget(buildAppUnderTest(initialRoute: AppRoutes.projetoForm));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProjetoFormScreen), findsNothing);
       expect(find.byType(LoginScreen), findsOneWidget);
     });
 

@@ -51,10 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _errorMessage = e.message;
       });
-      // Se não autorizado (401), desloga e redireciona imediatamente
-      if (e.statusCode == 401) {
-        _handleLogout();
-      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

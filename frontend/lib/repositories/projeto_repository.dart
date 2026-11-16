@@ -7,6 +7,21 @@ import 'auth_repository.dart'; // Reutiliza ApiException
 abstract class IProjetoRepository {
   Future<List<Projeto>> listarProjetos({required String token, String? searchNome});
   Future<Projeto> obterProjeto({required String token, required int projetoId});
+  Future<Projeto> criarProjeto({
+    required String token,
+    required String nome,
+    String? descricao,
+  });
+  Future<Projeto> atualizarProjeto({
+    required String token,
+    required int projetoId,
+    required String nome,
+    String? descricao,
+  });
+  Future<void> deletarProjeto({
+    required String token,
+    required int projetoId,
+  });
 }
 
 /// Implementação concreta do Repositório de Projetos.
@@ -83,6 +98,85 @@ class ProjetoRepository implements IProjetoRepository {
     }
   }
 
+  @override
+  Future<Projeto> criarProjeto({
+    required String token,
+    required String nome,
+    String? descricao,
+  }) async {
+    final uri = Uri.parse('$baseUrl/projetos/');
+    try {
+      final response = await client.post(
+        uri,
+        headers: _buildHeaders(token),
+        body: jsonEncode({
+          'nome': nome,
+          'descricao': descricao,
+        }),
+      );
+
+      final data = _processResponse(response);
+      if (data is Map<String, dynamic>) {
+        return Projeto.fromJson(data);
+      }
+      throw const ApiException('Formato de resposta inválido ao criar projeto.');
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Falha ao criar projeto: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<Projeto> atualizarProjeto({
+    required String token,
+    required int projetoId,
+    required String nome,
+    String? descricao,
+  }) async {
+    final uri = Uri.parse('$baseUrl/projetos/$projetoId');
+    try {
+      final response = await client.patch(
+        uri,
+        headers: _buildHeaders(token),
+        body: jsonEncode({
+          'nome': nome,
+          'descricao': descricao,
+        }),
+      );
+
+      final data = _processResponse(response);
+      if (data is Map<String, dynamic>) {
+        return Projeto.fromJson(data);
+      }
+      throw const ApiException('Formato de resposta inválido ao atualizar projeto.');
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Falha ao atualizar projeto: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<void> deletarProjeto({
+    required String token,
+    required int projetoId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/projetos/$projetoId');
+    try {
+      final response = await client.delete(
+        uri,
+        headers: _buildHeaders(token),
+      );
+
+      _processResponse(response);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Falha ao excluir projeto: ${e.toString()}');
+    }
+  }
+
   /// Trata a resposta HTTP da API FastAPI
   dynamic _processResponse(http.Response response) {
     dynamic body;
@@ -101,7 +195,16 @@ class ProjetoRepository implements IProjetoRepository {
     String errorMessage = 'Erro ao processar requisição (${response.statusCode})';
 
     if (body is Map<String, dynamic>) {
-      if (body.containsKey('mensagem')) {
+      if (body.containsKey('detalhes') &&
+          body['detalhes'] is List &&
+          (body['detalhes'] as List).isNotEmpty) {
+        final firstDet = (body['detalhes'] as List).first;
+        if (firstDet is Map && firstDet.containsKey('mensagem')) {
+          errorMessage = firstDet['mensagem'].toString();
+        } else if (body.containsKey('mensagem')) {
+          errorMessage = body['mensagem'].toString();
+        }
+      } else if (body.containsKey('mensagem')) {
         errorMessage = body['mensagem'].toString();
       } else if (body.containsKey('detail')) {
         final detail = body['detail'];

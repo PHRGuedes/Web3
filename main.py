@@ -107,7 +107,7 @@ def acesso_negado_handler(request: Request, exc: AcessoNegadoError):
 @app.exception_handler(ProjetoNomeDuplicadoError)
 def projeto_nome_duplicado_handler(request: Request, exc: ProjetoNomeDuplicadoError):
     return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
+        status_code=status.HTTP_409_CONFLICT,
         content={"erro": "RN01_NOME_DUPLICADO", "mensagem": exc.mensagem},
     )
 

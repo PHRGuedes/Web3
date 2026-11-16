@@ -26,6 +26,8 @@ class ProjetosScreen extends StatefulWidget {
 
 class _ProjetosScreenState extends State<ProjetosScreen> {
   Future<List<Projeto>>? _futureProjetos;
+  final TextEditingController _searchController = TextEditingController();
+  String _termoBusca = '';
 
   @override
   void didChangeDependencies() {
@@ -35,10 +37,94 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
     }
   }
 
-  void _carregarProjetos() {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _carregarProjetos([String? termo]) {
+    final busca = termo ?? _searchController.text.trim();
     setState(() {
-      _futureProjetos = context.read<ProjetoService>().listarProjetos();
+      _termoBusca = busca;
+      _futureProjetos = context.read<ProjetoService>().listarProjetos(
+            searchNome: busca.isEmpty ? null : busca,
+          );
     });
+  }
+
+  void _limparBusca() {
+    _searchController.clear();
+    _carregarProjetos('');
+  }
+
+  Future<void> _navegarCriarProjeto() async {
+    final atualizou = await Navigator.of(context).pushNamed(AppRoutes.projetoForm);
+    if (atualizou == true) {
+      _carregarProjetos();
+    }
+  }
+
+  Future<void> _navegarEditarProjeto(Projeto projeto) async {
+    final atualizou = await Navigator.of(context).pushNamed(
+      AppRoutes.projetoForm,
+      arguments: projeto,
+    );
+    if (atualizou == true) {
+      _carregarProjetos();
+    }
+  }
+
+  Future<void> _confirmarExclusao(Projeto projeto) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirmar Exclusão'),
+          content: Text('Tem certeza que deseja excluir o projeto "${projeto.nome}"? Esta ação não pode ser desfeita.'),
+          actions: [
+            TextButton(
+              key: const Key('btn_cancelar_exclusao'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              key: const Key('btn_confirmar_exclusao'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Excluir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmou == true && mounted) {
+      try {
+        await context.read<ProjetoService>().deletarProjeto(projeto.id);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Projeto excluído com sucesso!'),
+            backgroundColor: Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _carregarProjetos();
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -59,20 +145,83 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
         ),
         actions: [
           IconButton(
+            key: const Key('btn_appbar_novo_projeto'),
+            tooltip: 'Novo Projeto',
+            icon: const Icon(Icons.add_rounded, color: Color(0xFF1E60ED)),
+            onPressed: _navegarCriarProjeto,
+          ),
+          IconButton(
             tooltip: 'Atualizar lista',
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF1E60ED)),
             onPressed: _carregarProjetos,
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        key: const Key('btn_novo_projeto'),
+        onPressed: _navegarCriarProjeto,
+        backgroundColor: const Color(0xFF1E60ED),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text(
+          'Novo Projeto',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
       drawer: const AppDrawer(rotaAtual: AppRoutes.projetos),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 800),
-            child: FutureBuilder<List<Projeto>>(
-              future: _futureProjetos,
-              builder: (context, snapshot) {
+            child: Column(
+              children: [
+                // Campo de Busca / Filtro via API (?nome=)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 8.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      key: const Key('campo_busca_projetos'),
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar projetos por nome...',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF1E60ED), size: 22),
+                        suffixIcon: _termoBusca.isNotEmpty
+                            ? IconButton(
+                                key: const Key('btn_limpar_busca'),
+                                icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                tooltip: 'Limpar busca',
+                                onPressed: _limparBusca,
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                      onSubmitted: (termo) => _carregarProjetos(termo),
+                      onChanged: (termo) => _carregarProjetos(termo),
+                    ),
+                  ),
+                ),
+
+                // Lista de Projetos com os 4 Estados
+                Expanded(
+                  child: FutureBuilder<List<Projeto>>(
+                    future: _futureProjetos,
+                    builder: (context, snapshot) {
                 // ESTADO 1: Carregando
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
@@ -180,6 +329,8 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
 
                 // ESTADO 3: Lista Vazia
                 if (projetos.isEmpty) {
+                  final isFiltrando = _termoBusca.isNotEmpty;
+
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
@@ -199,9 +350,11 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
                                 color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              child: const Icon(
-                                Icons.folder_off_rounded,
-                                color: Color(0xFF94A3B8),
+                              child: Icon(
+                                isFiltrando
+                                    ? Icons.search_off_rounded
+                                    : Icons.folder_off_rounded,
+                                color: const Color(0xFF94A3B8),
                                 size: 42,
                               ),
                             ),
@@ -215,23 +368,55 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
-                              'Você ainda não possui projetos cadastrados em sua conta.',
+                            Text(
+                              isFiltrando
+                                  ? 'Nenhum resultado corresponde à busca por "$_termoBusca".'
+                                  : 'Você ainda não possui projetos cadastrados em sua conta.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF64748B),
                               ),
                             ),
                             const SizedBox(height: 20),
-                            OutlinedButton.icon(
-                              onPressed: _carregarProjetos,
-                              icon: const Icon(Icons.refresh_rounded, size: 18),
-                              label: const Text('Recarregar'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF1E60ED),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                              ),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                if (isFiltrando)
+                                  ElevatedButton.icon(
+                                    key: const Key('btn_limpar_filtro'),
+                                    onPressed: _limparBusca,
+                                    icon: const Icon(Icons.clear_rounded, size: 18),
+                                    label: const Text('Limpar busca'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1E60ED),
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  )
+                                else ...[
+                                  ElevatedButton.icon(
+                                    key: const Key('btn_vazio_novo_projeto'),
+                                    onPressed: _navegarCriarProjeto,
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('Novo Projeto'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1E60ED),
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: _carregarProjetos,
+                                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                                    label: const Text('Recarregar'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF1E60ED),
+                                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ],
                         ),
@@ -262,12 +447,18 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
               },
             ),
           ),
-        ),
+        ],
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildBannerInformativo({required int total}) {
+    final subtitulo = _termoBusca.isNotEmpty
+        ? '$total projeto(s) encontrado(s) para "$_termoBusca"'
+        : '$total projeto(s) vinculado(s) à sua conta';
+
     return Container(
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
@@ -310,7 +501,7 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$total projeto(s) vinculado(s) à sua conta',
+                  subtitulo,
                   style: const TextStyle(
                     color: Color(0xFF94A3B8),
                     fontSize: 13,
@@ -332,12 +523,15 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
+        onTap: () async {
           // REGRA DE NAVEGAÇÃO: Rota nomeada passando projeto.id como argumento
-          Navigator.of(context).pushNamed(
+          final atualizou = await Navigator.of(context).pushNamed(
             AppRoutes.projetoDetalhes,
             arguments: projeto.id,
           );
+          if (atualizou == true) {
+            _carregarProjetos();
+          }
         },
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -372,20 +566,43 @@ class _ProjetosScreenState extends State<ProjetosScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '#${projeto.id}',
-                      style: const TextStyle(
-                        color: Color(0xFF1E60ED),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '#${projeto.id}',
+                          style: const TextStyle(
+                            color: Color(0xFF1E60ED),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        key: Key('btn_editar_projeto_${projeto.id}'),
+                        icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+                        tooltip: 'Editar projeto',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => _navegarEditarProjeto(projeto),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        key: Key('btn_excluir_projeto_${projeto.id}'),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFDC2626)),
+                        tooltip: 'Excluir projeto',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => _confirmarExclusao(projeto),
+                      ),
+                    ],
                   ),
                 ],
               ),

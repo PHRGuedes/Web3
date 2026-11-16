@@ -47,13 +47,14 @@ def obter_projeto(
 
 
 @router.put("/{projeto_id}", response_model=ProjetoPublic)
+@router.patch("/{projeto_id}", response_model=ProjetoPublic)
 def atualizar_projeto(
     projeto_id: int,
     dados: ProjetoUpdate,
     current_user: Usuario = Depends(get_current_user),
     service: ProjetoService = Depends(get_projeto_service)
 ):
-    """Atualiza dados de um projeto existente."""
+    """Atualiza dados de um projeto existente (suporta PUT e PATCH)."""
     return service.atualizar_projeto(projeto_id=projeto_id, dados=dados, usuario_id=current_user.id)
 
 

@@ -125,5 +125,164 @@ void main() {
             .having((e) => e.message, 'message', contains('Projeto não encontrado'))),
       );
     });
+
+    test('criarProjeto (POST) envia dados com token no cabeçalho e retorna Projeto criado', () async {
+      final jsonResponse = jsonEncode({
+        'id': 10,
+        'nome': 'Novo Projeto de Teste',
+        'descricao': 'Descrição do novo projeto',
+        'usuario_id': 1,
+        'created_at': '2026-11-16T15:00:00.000Z',
+      });
+
+      when(() => mockClient.post(
+            Uri.parse('$baseUrl/projetos/'),
+            headers: any(
+              named: 'headers',
+              that: containsPair('Authorization', 'Bearer token_teste_123'),
+            ),
+            body: any(named: 'body'),
+          )).thenAnswer((_) async => http.Response(jsonResponse, 201));
+
+      final resultado = await repository.criarProjeto(
+        token: 'token_teste_123',
+        nome: 'Novo Projeto de Teste',
+        descricao: 'Descrição do novo projeto',
+      );
+
+      expect(resultado.id, 10);
+      expect(resultado.nome, 'Novo Projeto de Teste');
+      expect(resultado.descricao, 'Descrição do novo projeto');
+
+      verify(() => mockClient.post(
+            Uri.parse('$baseUrl/projetos/'),
+            headers: any(
+              named: 'headers',
+              that: containsPair('Authorization', 'Bearer token_teste_123'),
+            ),
+            body: jsonEncode({
+              'nome': 'Novo Projeto de Teste',
+              'descricao': 'Descrição do novo projeto',
+            }),
+          )).called(1);
+    });
+
+    test('criarProjeto lança ApiException com status 409 e frase da API em caso de nome duplicado', () async {
+      when(() => mockClient.post(
+            Uri.parse('$baseUrl/projetos/'),
+            headers: any(named: 'headers'),
+            body: any(named: 'body'),
+          )).thenAnswer((_) async => http.Response(
+            jsonEncode({
+              'erro': 'RN01_NOME_DUPLICADO',
+              'mensagem': "Já existe um projeto cadastrado com o nome 'ReqFlow' para este usuário (RN01).",
+            }),
+            409,
+          ));
+
+      expect(
+        () => repository.criarProjeto(
+          token: 'token_teste_123',
+          nome: 'ReqFlow',
+        ),
+        throwsA(isA<ApiException>()
+            .having((e) => e.statusCode, 'statusCode', 409)
+            .having((e) => e.message, 'message',
+                equals("Já existe um projeto cadastrado com o nome 'ReqFlow' para este usuário (RN01)."))),
+      );
+    });
+
+    test('criarProjeto lança ApiException com status 422 e frase da API em caso de dados inválidos', () async {
+      when(() => mockClient.post(
+            Uri.parse('$baseUrl/projetos/'),
+            headers: any(named: 'headers'),
+            body: any(named: 'body'),
+          )).thenAnswer((_) async => http.Response(
+            jsonEncode({
+              'erro': 'VALIDACAO_FALHOU',
+              'mensagem': 'Falha na validação dos dados de entrada.',
+              'detalhes': [
+                {'campo': 'nome', 'mensagem': 'String should have at least 2 characters'}
+              ]
+            }),
+            422,
+          ));
+
+      expect(
+        () => repository.criarProjeto(
+          token: 'token_teste_123',
+          nome: 'A',
+        ),
+        throwsA(isA<ApiException>()
+            .having((e) => e.statusCode, 'statusCode', 422)
+            .having((e) => e.message, 'message',
+                equals('String should have at least 2 characters'))),
+      );
+    });
+
+    test('atualizarProjeto (PATCH) envia dados com token no cabeçalho e retorna Projeto atualizado', () async {
+      final jsonResponse = jsonEncode({
+        'id': 10,
+        'nome': 'Nome Atualizado',
+        'descricao': 'Nova Descrição',
+        'usuario_id': 1,
+        'created_at': '2026-11-16T15:00:00.000Z',
+      });
+
+      when(() => mockClient.patch(
+            Uri.parse('$baseUrl/projetos/10'),
+            headers: any(
+              named: 'headers',
+              that: containsPair('Authorization', 'Bearer token_teste_123'),
+            ),
+            body: any(named: 'body'),
+          )).thenAnswer((_) async => http.Response(jsonResponse, 200));
+
+      final resultado = await repository.atualizarProjeto(
+        token: 'token_teste_123',
+        projetoId: 10,
+        nome: 'Nome Atualizado',
+        descricao: 'Nova Descrição',
+      );
+
+      expect(resultado.id, 10);
+      expect(resultado.nome, 'Nome Atualizado');
+      expect(resultado.descricao, 'Nova Descrição');
+
+      verify(() => mockClient.patch(
+            Uri.parse('$baseUrl/projetos/10'),
+            headers: any(
+              named: 'headers',
+              that: containsPair('Authorization', 'Bearer token_teste_123'),
+            ),
+            body: jsonEncode({
+              'nome': 'Nome Atualizado',
+              'descricao': 'Nova Descrição',
+            }),
+          )).called(1);
+    });
+
+    test('deletarProjeto (DELETE) envia requisição com token e completa com sucesso em 204', () async {
+      when(() => mockClient.delete(
+            Uri.parse('$baseUrl/projetos/10'),
+            headers: any(
+              named: 'headers',
+              that: containsPair('Authorization', 'Bearer token_teste_123'),
+            ),
+          )).thenAnswer((_) async => http.Response('', 204));
+
+      await repository.deletarProjeto(
+        token: 'token_teste_123',
+        projetoId: 10,
+      );
+
+      verify(() => mockClient.delete(
+            Uri.parse('$baseUrl/projetos/10'),
+            headers: any(
+              named: 'headers',
+              that: containsPair('Authorization', 'Bearer token_teste_123'),
+            ),
+          )).called(1);
+    });
   });
 }

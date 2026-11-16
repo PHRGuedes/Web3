@@ -117,5 +117,91 @@ void main() {
             projetoId: any(named: 'projetoId'),
           ));
     });
+
+    test('criarProjeto delega para repositório passando o token da sessão', () async {
+      when(() => mockSessaoService.token).thenReturn('token_sessao_123');
+
+      final novoProjeto = Projeto(
+        id: 50,
+        nome: 'Projeto Criado',
+        descricao: 'Desc',
+        usuarioId: 1,
+        createdAt: DateTime(2026, 11, 16),
+      );
+
+      when(() => mockProjetoRepo.criarProjeto(
+            token: 'token_sessao_123',
+            nome: 'Projeto Criado',
+            descricao: 'Desc',
+          )).thenAnswer((_) async => novoProjeto);
+
+      final resultado = await projetoService.criarProjeto(
+        nome: 'Projeto Criado',
+        descricao: 'Desc',
+      );
+
+      expect(resultado, equals(novoProjeto));
+      verify(() => mockProjetoRepo.criarProjeto(
+            token: 'token_sessao_123',
+            nome: 'Projeto Criado',
+            descricao: 'Desc',
+          )).called(1);
+    });
+
+    test('criarProjeto valida que nome não pode ser vazio', () async {
+      expect(
+        () => projetoService.criarProjeto(nome: '   '),
+        throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('obrigatório'))),
+      );
+    });
+
+    test('atualizarProjeto delega para repositório com ID, nome e token', () async {
+      when(() => mockSessaoService.token).thenReturn('token_sessao_123');
+
+      final projetoAtualizado = Projeto(
+        id: 50,
+        nome: 'Projeto Atualizado',
+        descricao: 'Desc Nova',
+        usuarioId: 1,
+        createdAt: DateTime(2026, 11, 16),
+      );
+
+      when(() => mockProjetoRepo.atualizarProjeto(
+            token: 'token_sessao_123',
+            projetoId: 50,
+            nome: 'Projeto Atualizado',
+            descricao: 'Desc Nova',
+          )).thenAnswer((_) async => projetoAtualizado);
+
+      final resultado = await projetoService.atualizarProjeto(
+        projetoId: 50,
+        nome: 'Projeto Atualizado',
+        descricao: 'Desc Nova',
+      );
+
+      expect(resultado, equals(projetoAtualizado));
+      verify(() => mockProjetoRepo.atualizarProjeto(
+            token: 'token_sessao_123',
+            projetoId: 50,
+            nome: 'Projeto Atualizado',
+            descricao: 'Desc Nova',
+          )).called(1);
+    });
+
+    test('deletarProjeto delega exclusão para repositório com token', () async {
+      when(() => mockSessaoService.token).thenReturn('token_sessao_123');
+
+      when(() => mockProjetoRepo.deletarProjeto(
+            token: 'token_sessao_123',
+            projetoId: 50,
+          )).thenAnswer((_) async {});
+
+      await projetoService.deletarProjeto(50);
+
+      verify(() => mockProjetoRepo.deletarProjeto(
+            token: 'token_sessao_123',
+            projetoId: 50,
+          )).called(1);
+    });
   });
 }

@@ -11,6 +11,10 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:postgres@localhost:5433/requisitos_db"
 )
 
+# Compatibilidade com provedores de nuvem que utilizam 'postgres://' (Render, Supabase, Railway)
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # Engine do SQLAlchemy
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 

@@ -62,4 +62,95 @@ class ProjetoService {
       rethrow;
     }
   }
+
+  /// Cria um novo projeto vinculado ao usuário logado (POST).
+  Future<Projeto> criarProjeto({
+    required String nome,
+    String? descricao,
+  }) async {
+    final nomeLimpo = nome.trim();
+    if (nomeLimpo.isEmpty) {
+      throw const ApiException('O nome do projeto é obrigatório.');
+    }
+
+    final token = sessaoService.token;
+    if (token == null || token.isEmpty) {
+      await sessaoService.tratarFugaSessao401();
+      throw const ApiException('Sessão expirada. Faça login novamente.', 401);
+    }
+
+    try {
+      return await projetoRepository.criarProjeto(
+        token: token,
+        nome: nomeLimpo,
+        descricao: descricao?.trim(),
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        await sessaoService.tratarFugaSessao401();
+      }
+      rethrow;
+    }
+  }
+
+  /// Atualiza os dados de um projeto existente (PATCH).
+  Future<Projeto> atualizarProjeto({
+    required int projetoId,
+    required String nome,
+    String? descricao,
+  }) async {
+    if (projetoId <= 0) {
+      throw const ApiException('Identificador de projeto inválido.');
+    }
+
+    final nomeLimpo = nome.trim();
+    if (nomeLimpo.isEmpty) {
+      throw const ApiException('O nome do projeto é obrigatório.');
+    }
+
+    final token = sessaoService.token;
+    if (token == null || token.isEmpty) {
+      await sessaoService.tratarFugaSessao401();
+      throw const ApiException('Sessão expirada. Faça login novamente.', 401);
+    }
+
+    try {
+      return await projetoRepository.atualizarProjeto(
+        token: token,
+        projetoId: projetoId,
+        nome: nomeLimpo,
+        descricao: descricao?.trim(),
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        await sessaoService.tratarFugaSessao401();
+      }
+      rethrow;
+    }
+  }
+
+  /// Exclui um projeto através do seu identificador (DELETE).
+  Future<void> deletarProjeto(int projetoId) async {
+    if (projetoId <= 0) {
+      throw const ApiException('Identificador de projeto inválido.');
+    }
+
+    final token = sessaoService.token;
+    if (token == null || token.isEmpty) {
+      await sessaoService.tratarFugaSessao401();
+      throw const ApiException('Sessão expirada. Faça login novamente.', 401);
+    }
+
+    try {
+      await projetoRepository.deletarProjeto(
+        token: token,
+        projetoId: projetoId,
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        await sessaoService.tratarFugaSessao401();
+      }
+      rethrow;
+    }
+  }
 }

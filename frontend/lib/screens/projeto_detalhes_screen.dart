@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/projeto.dart';
 import '../repositories/auth_repository.dart';
+import '../routes.dart';
 import '../services/projeto_service.dart';
 
 /// Tela de Detalhes do Projeto.
@@ -33,11 +34,76 @@ class _ProjetoDetalhesScreenState extends State<ProjetoDetalhesScreen> {
     }
   }
 
+  bool _teveAlteracao = false;
+
   void _recarregar() {
     if (_projetoId != null) {
       setState(() {
         _futureProjeto = context.read<ProjetoService>().obterProjeto(_projetoId!);
       });
+    }
+  }
+
+  Future<void> _editarProjeto(Projeto projeto) async {
+    final atualizou = await Navigator.of(context).pushNamed(
+      AppRoutes.projetoForm,
+      arguments: projeto,
+    );
+    if (atualizou == true) {
+      _teveAlteracao = true;
+      _recarregar();
+    }
+  }
+
+  Future<void> _excluirProjeto(Projeto projeto) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirmar Exclusão'),
+          content: Text('Tem certeza que deseja excluir o projeto "${projeto.nome}"? Esta ação não pode ser desfeita.'),
+          actions: [
+            TextButton(
+              key: const Key('btn_cancelar_exclusao_detalhes'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              key: const Key('btn_confirmar_exclusao_detalhes'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Excluir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmou == true && mounted) {
+      try {
+        await context.read<ProjetoService>().deletarProjeto(projeto.id);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Projeto excluído com sucesso!'),
+            backgroundColor: Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop(true);
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -50,6 +116,10 @@ class _ProjetoDetalhesScreenState extends State<ProjetoDetalhesScreen> {
         elevation: 1,
         shadowColor: Colors.black.withValues(alpha: 0.05),
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(_teveAlteracao),
+        ),
         title: const Text(
           'Detalhes do Projeto',
           style: TextStyle(
@@ -279,6 +349,19 @@ class _ProjetoDetalhesScreenState extends State<ProjetoDetalhesScreen> {
                               ),
                             ],
                           ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          key: const Key('btn_detalhes_editar_projeto'),
+                          icon: const Icon(Icons.edit_outlined, color: Color(0xFF1E60ED)),
+                          tooltip: 'Editar Projeto',
+                          onPressed: () => _editarProjeto(projeto),
+                        ),
+                        IconButton(
+                          key: const Key('btn_detalhes_excluir_projeto'),
+                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626)),
+                          tooltip: 'Excluir Projeto',
+                          onPressed: () => _excluirProjeto(projeto),
                         ),
                       ],
                     ),
